@@ -119,7 +119,7 @@ coordinate_cache = {
 }
     
     # 快捷键
-STOP_hotkey = 'ctrl+shift+x'
+    STOP_hotkey = 'ctrl+shift+x'
     
     @classmethod
     def init(cls):
