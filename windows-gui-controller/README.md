@@ -37,6 +37,7 @@
 ### 1. 安装依赖
 
 ```powershell
+cd windows-gui-controller
 pip install flask pyautogui pillow keyboard
 ```
 
@@ -78,34 +79,36 @@ WSL IP: 172.x.x.x
 在 WSL 中使用 `win-gui` 脚本：
 
 ```bash
+cd windows-gui-controller
+
 # 鼠标控制
-win-gui click 100 200
-win-gui move 500 500
-win-gui drag 0 0 100 100
+./win-gui click 100 200
+./win-gui move 500 500
+./win-gui drag 0 0 100 100
 
 # 键盘控制
-win-gui type hello
-win-gui press enter
-win-gui hotkey ctrl,c
+./win-gui type hello
+./win-gui press enter
+./win-gui hotkey ctrl,c
 
 # 屏幕操作
-win-gui screenshot
-win-gui position
-win-gui size
+./win-gui screenshot
+./win-gui position
+./win-gui size
 
 # 文件操作
-win-gui upload file.txt
-win-gui download C:/path/to/file
-win-gui list
+./win-gui upload file.txt
+./win-gui download C:/path/to/file
+./win-gui list
 
 # 应用管理
-win-gui open notepad
-win-gui close notepad
+./win-gui open notepad
+./win-gui close notepad
 
 # 系统
-win-gui version
-win-gui capabilities
-win-gui health
+./win-gui version
+./win-gui capabilities
+./win-gui health
 ```
 
 ## 桌面指示器
@@ -238,6 +241,20 @@ curl "http://192.168.2.22:8888/close?app=notepad"
 curl "http://192.168.2.22:8888/running"
 ```
 
+### 能力查询
+
+```bash
+# 版本
+curl "http://192.168.2.22:8888/version"
+
+# 所有能力
+curl "http://192.168.2.22:8888/capabilities"
+
+# 特定分类
+curl "http://192.168.2.22:8888/capabilities/mouse"
+curl "http://192.168.2.22:8888/capabilities/keyboard"
+```
+
 ## 快捷键
 
 - `Ctrl+Shift+X` - 停止服务（需安装 keyboard 模块）
@@ -245,6 +262,12 @@ curl "http://192.168.2.22:8888/running"
 ## 目录结构
 
 ```
+windows-gui-controller/
+├── README.md                 # 本文件
+├── windows_controller.py    # 主服务
+├── desktop_indicator.py      # 桌面指示器
+└── win-gui                  # WSL 调用脚本
+
 D:\OpenClaw\
 ├── uploads\          # 上传文件
 ├── screenshots\     # 截图保存
