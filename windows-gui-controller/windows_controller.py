@@ -364,7 +364,7 @@ CAPABILITIES = {
     },
     
     "app": {
-        "open": {"args": ["app"], "desc": "打开应用", "apps": list(APPS.keys())},
+        "open": {"args": ["app"], "desc": "打开应用", "apps": ["notepad", "calc", "explorer", "cmd", "powershell", "chrome", "edge", "qq", "wechat", "dingtalk"]},
         "close": {"args": ["app"], "desc": "关闭应用"},
         "running": {"desc": "列出运行中的应用"},
     },
