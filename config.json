@@ -1,0 +1,114 @@
+{
+  "company": {
+    "name": "西安伟信电子科技有限公司",
+    "nameEn": "Xi'an Weixin Electronics Technology Co., Ltd.",
+    "tagline": "专业卫星通信设备制造商",
+    "taglineEn": "Professional Satellite Communication Equipment Manufacturer",
+    "phone": "029-XXXXXXXX",
+    "email": "info@weixin-electronics.com",
+    "address": "陕西省西安市",
+    "website": "www.weixin-electronics.com"
+  },
+  "products": [
+    {
+      "id": "wx-sat-100",
+      "name": "卫星通信终端 XS-100",
+      "nameEn": "Satellite Terminal XS-100",
+      "category": "卫星通信设备",
+      "description": "适用于应急通信、偏远地区数据传输的高性能卫星通信终端",
+      "descriptionEn": "High-performance satellite communication terminal for emergency communications and remote area data transmission",
+      "image": "images/product1.jpg",
+      "features": [
+        "支持多频段工作",
+        "快速自动对星",
+        "便携式设计",
+        "低功耗运行"
+      ],
+      "parameters": {
+        "频率范围": "L/S波段",
+        "发射功率": "5W",
+        "天线增益": "≥42dBi",
+        "重量": "2.5kg",
+        "尺寸": "300×200×50mm",
+        "工作温度": "-40°C ~ +55°C",
+        "供电": "DC 12-24V / AC 220V",
+        "数据速率": "Up to 2Mbps"
+      }
+    },
+    {
+      "id": "wx-sat-200",
+      "name": "卫星调制解调器 WM-200",
+      "nameEn": "Satellite Modem WM-200",
+      "category": "卫星通信设备",
+      "description": "支持多种调制方式的高速卫星调制解调器",
+      "descriptionEn": "High-speed satellite modem supporting multiple modulation schemes",
+      "image": "images/product2.jpg",
+      "features": [
+        "多调制方式支持",
+        "自适应编码",
+        "Web管理界面",
+        "多种接口"
+      ],
+      "parameters": {
+        "调制方式": "BPSK/QPSK/8PSK/16QAM",
+        "符号率": "1-45Msps",
+        "FEC": "1/2, 2/3, 3/4, 5/6",
+        "接口": "RJ45/RS232/USB",
+        "功耗": "≤15W",
+        "重量": "1.2kg"
+      }
+    },
+    {
+      "id": "wx-antenna-300",
+      "name": "便携式卫星天线 XP-300",
+      "nameEn": "Portable Satellite Antenna XP-300",
+      "category": "天线设备",
+      "description": "快速部署的便携式卫星通信天线",
+      "descriptionEn": "Rapidly deployable portable satellite communication antenna",
+      "image": "images/product3.jpg",
+      "features": [
+        "一键自动对星",
+        "碳纤维材质",
+        "快速折叠收纳",
+        "抗风能力强"
+      ],
+      "parameters": {
+        "口径": "0.6m",
+        "增益": "≥38dBi@14GHz",
+        "对星时间": "≤3分钟",
+        "工作风速": "≤12m/s",
+        "包装尺寸": "650×450×150mm",
+        "总重量": "8kg"
+      }
+    }
+  ],
+  "sections": {
+    "home": {
+      "heroTitle": "连接无限，通信无界",
+      "heroTitleEn": "Connect Beyond Limits",
+      "heroSubtitle": "专业卫星通信设备及解决方案提供商",
+      "heroSubtitleEn": "Professional Satellite Communication Equipment & Solutions Provider"
+    },
+    "about": {
+      "title": "关于我们",
+      "titleEn": "About Us",
+      "content": "西安伟信电子科技有限公司是一家专注于卫星通信设备研发、生产和销售的高新技术企业。我们致力于为客户提供高品质的卫星通信解决方案，产品广泛应用于应急通信、远程教育、医疗数据传输等领域。",
+      "contentEn": "Xi'an Weixin Electronics Technology Co., Ltd. is a high-tech enterprise specializing in the R&D, production, and sales of satellite communication equipment. We are committed to providing high-quality satellite communication solutions for our customers."
+    },
+    "contact": {
+      "title": "联系我们",
+      "titleEn": "Contact Us",
+      "formTitle": "在线留言",
+      "formTitleEn": "Leave a Message",
+      "fields": {
+        "name": "姓名",
+        "email": "邮箱",
+        "phone": "电话",
+        "company": "单位",
+        "message": "留言内容"
+      },
+      "submit": "提交",
+      "submitEn": "Submit"
+    }
+  }
+}
