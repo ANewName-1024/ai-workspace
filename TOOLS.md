@@ -35,9 +35,12 @@ Things like:
 
 - **能力**: 通过 GitHub API 推送代码、创建文件、读取仓库内容
 - **认证方式**: Personal Access Token (PAT)
+- **凭据位置**: `/root/.openclaw/credentials/github.env`
+- **推送脚本**: `/root/.openclaw/credentials/github-push.sh`
 - **使用方法**: 
-  - curl 调用 GitHub REST API
-  - 格式: `https://x-access-token:{TOKEN}@github.com/{owner}/{repo}.git`
+  - 方式一（推荐）: `source /root/.openclaw/credentials/github.env && git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git"`
+  - 方式二: 直接调用脚本 `./github-push.sh /path/to/repo "commit message"`
+  - 方式三: curl 调用 GitHub REST API
 - **注意**: Token 需有 repo 权限才能推送
 
 ## Why Separate?
