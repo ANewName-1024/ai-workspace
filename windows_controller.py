@@ -321,11 +321,93 @@ def index():
         }
     })
 
+# ============================================================
+# 版本与能力
+# ============================================================
+
+VERSION = "2.0.0"
+
+CAPABILITIES = {
+    "version": VERSION,
+    "service": "Windows GUI Controller",
+    "description": "为 AI Agent 提供 Windows 桌面远程控制能力",
+    
+    "mouse": {
+        "click": {"args": ["x", "y"], "optional": ["button", "clicks"], "desc": "鼠标点击"},
+        "dblclick": {"args": ["x", "y"], "desc": "双击"},
+        "rightclick": {"args": ["x", "y"], "desc": "右键点击"},
+        "move": {"args": ["x", "y"], "optional": ["duration"], "desc": "移动鼠标"},
+        "drag": {"args": ["x1", "y1", "x2", "y2"], "optional": ["duration"], "desc": "拖拽"},
+        "scroll": {"args": ["clicks"], "optional": ["x", "y"], "desc": "滚动"},
+    },
+    
+    "keyboard": {
+        "type": {"args": ["text"], "optional": ["interval"], "desc": "输入文字"},
+        "press": {"args": ["key"], "optional": ["presses"], "desc": "按键"},
+        "hotkey": {"args": ["keys"], "desc": "组合键"},
+    },
+    
+    "screen": {
+        "screenshot": {"desc": "截图"},
+        "screenshot/file": {"desc": "截图并保存"},
+        "position": {"desc": "获取鼠标位置"},
+        "size": {"desc": "获取屏幕分辨率"},
+        "pixel": {"args": ["x", "y"], "desc": "获取像素颜色"},
+    },
+    
+    "file": {
+        "upload": {"desc": "上传文件", "method": "POST"},
+        "download": {"args": ["path"], "desc": "下载文件"},
+        "list": {"args": ["path"], "optional": ["recursive"], "desc": "列出文件"},
+        "delete": {"args": ["path"], "desc": "删除文件"},
+        "cleanup": {"desc": "清理过期文件"},
+    },
+    
+    "app": {
+        "open": {"args": ["app"], "desc": "打开应用", "apps": list(APPS.keys())},
+        "close": {"args": ["app"], "desc": "关闭应用"},
+        "running": {"desc": "列出运行中的应用"},
+    },
+    
+    "system": {
+        "health": {"desc": "健康检查"},
+        "stop": {"desc": "停止服务"},
+        "run": {"args": ["cmd"], "optional": ["shell"], "desc": "执行命令"},
+    },
+    
+    "config": {
+        "storage": str(Config.DATA_DIR),
+        "file_ttl": Config.FILE_TTL,
+        "max_upload_mb": Config.MAX_UPLOAD_SIZE // 1024 // 1024,
+    }
+}
+
+@app.route('/version')
+def get_version():
+    """获取版本信息"""
+    return json_response({
+        "version": VERSION,
+        "service": "Windows GUI Controller",
+    })
+
+@app.route('/capabilities')
+def get_capabilities():
+    """获取所有能力"""
+    return json_response(CAPABILITIES)
+
+@app.route('/capabilities/<category>')
+def get_capability_category(category):
+    """获取特定分类的能力"""
+    if category in CAPABILITIES:
+        return json_response(CAPABILITIES[category])
+    return json_response({"error": "Category not found"}, 404)
+
 @app.route('/health')
 def health():
     """健康检查"""
     return json_response({
         "status": "ok",
+        "version": VERSION,
         "uptime": State.uptime(),
         "action_count": State.action_count,
         "config": {

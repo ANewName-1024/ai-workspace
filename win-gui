@@ -96,12 +96,28 @@ case "$1" in
   health)
     curl -s "${BASE_URL}/health"
     ;;
+  version)
+    curl -s "${BASE_URL}/version"
+    ;;
+  capabilities|caps)
+    curl -s "${BASE_URL}/capabilities"
+    ;;
+  caps)
+    category="$2"
+    curl -s "${BASE_URL}/capabilities/${category}"
+    ;;
   
   # 帮助
   help|--help|-h)
-    echo "Windows GUI Controller - Pro Edition"
+    echo "Windows GUI Controller - v2.0"
     echo ""
     echo "用法: win-gui <command> [args...]"
+    echo ""
+    echo "版本与能力:"
+    echo "  win-gui version         查看版本"
+    echo "  win-gui capabilities   查看所有能力"
+    echo "  win-gui caps <分类>    查看特定分类能力"
+    echo "  win-gui health         健康检查"
     echo ""
     echo "鼠标控制:"
     echo "  click <x> <y>           鼠标点击"
