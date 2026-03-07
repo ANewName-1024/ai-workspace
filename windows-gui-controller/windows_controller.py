@@ -364,15 +364,30 @@ CAPABILITIES = {
     },
     
     "app": {
-        "open": {"args": ["app"], "desc": "打开应用", "apps": ["notepad", "calc", "explorer", "cmd", "powershell", "chrome", "edge", "qq", "wechat", "dingtalk"]},
+        "open": {"args": ["app"], "desc": "打开应用", "apps": ["notepad", "calc", "explorer", "cmd", "powershell", "chrome", "edge", "qq", "wechat", "dingtalk", "vscode", "sublime", "idea", "pycharm", "wechatwork", "tim", "music", "steam"]},
         "close": {"args": ["app"], "desc": "关闭应用"},
         "running": {"desc": "列出运行中的应用"},
+    },
+    
+    "clipboard": {
+        "read": {"desc": "读取剪贴板"},
+        "write": {"args": ["text"], "desc": "写入剪贴板"},
+    },
+    
+    "window": {
+        "list": {"desc": "列出所有窗口"},
+        "activate": {"args": ["title"], "desc": "激活窗口（模糊匹配）"},
+        "minimize": {"args": ["title"], "desc": "最小化窗口"},
+        "maximize": {"args": ["title"], "desc": "最大化窗口"},
+        "close": {"args": ["title"], "desc": "关闭窗口"},
     },
     
     "system": {
         "health": {"desc": "健康检查"},
         "stop": {"desc": "停止服务"},
         "run": {"args": ["cmd"], "optional": ["shell"], "desc": "执行命令"},
+        "info": {"desc": "获取系统信息"},
+        "logs": {"desc": "获取操作日志"},
     },
     
     "config": {
@@ -638,20 +653,23 @@ def file_upload():
     if file.filename == '':
         return json_response({"error": "Empty filename"}, 400)
     
-    # 生成唯一文件名
-    ext = Path(file.filename).suffix
-    unique_name = f"{uuid.uuid4().hex}{ext}"
-    filepath = Config.UPLOAD_DIR / unique_name
+    # 使用原始文件名，添加时间戳避免冲突
+    original_name = file.filename
+    timestamp = datetime.now().strftime("%H%M%S")
+    stem = Path(original_name).stem
+    ext = Path(original_name).suffix
+    safe_name = f"{stem}_{timestamp}{ext}"
+    filepath = Config.UPLOAD_DIR / safe_name
     
     # 保存
     file.save(filepath)
     
-    logger.action("upload", f"{file.filename} -> {unique_name}")
+    logger.action("upload", f"{original_name} -> {safe_name}")
     
     return json_response({
         "success": True,
-        "original_name": file.filename,
-        "stored_name": unique_name,
+        "original_name": original_name,
+        "stored_name": safe_name,
         "path": str(filepath),
         "size": filepath.stat().st_size,
         "ttl": Config.FILE_TTL
@@ -741,6 +759,14 @@ APPS = {
     'qq': 'QQ.exe',
     'wechat': 'WeChat.exe',
     'dingtalk': 'DingTalk.exe',
+    'vscode': 'Code.exe',
+    'sublime': 'sublime_text.exe',
+    'idea': 'idea64.exe',
+    'pycharm': 'pycharm64.exe',
+    'wechatwork': 'wechatwork.exe',
+    'tim': 'TIM.exe',
+    'music': 'Spotify.exe',
+    'steam': 'steam.exe',
 }
 
 @app.route('/open')
@@ -811,6 +837,282 @@ def system_stop():
     State.running = False
     logger.warning("Service stopped by user")
     return json_response({"success": True, "message": "Service will stop"})
+
+# ============================================================
+# 路由：剪贴板
+# ============================================================
+
+@app.route('/clipboard/read')
+def clipboard_read():
+    """读取剪贴板"""
+    try:
+        # 使用 PowerShell 读取剪贴板
+        result = os.popen('powershell -Command "Get-Clipboard"').read()
+        return json_response({"success": True, "text": result})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/clipboard/write')
+def clipboard_write():
+    """写入剪贴板"""
+    text = request.args.get('text', '')
+    try:
+        # 使用 PowerShell 写入剪贴板
+        escaped_text = text.replace('"', '`"')
+        os.system(f'powershell -Command "Set-Clipboard -Value \\"{escaped_text}\\"")')
+        logger.action("clipboard", "write")
+        return json_response({"success": True, "text": text})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+# ============================================================
+# 路由：窗口管理
+# ============================================================
+
+@app.route('/window/list')
+def window_list():
+    """列出所有窗口"""
+    try:
+        # 使用 PowerShell 获取窗口列表
+        script = '''
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Collections.Generic;
+public class WindowInfo {
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+    [DllImport("user32.dll")]
+    public static extern int GetWindowTextLength(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+}
+"@
+$windows = @()
+[WindowInfo]::EnumWindows({
+    param($hwnd, $lparam)
+    if ([WindowInfo]::IsWindowVisible($hwnd)) {
+        $len = [WindowInfo]::GetWindowTextLength($hwnd)
+        if ($len -gt 0) {
+            $sb = New-Object System.Text.StringBuilder($len + 1)
+            [WindowInfo]::GetWindowText($hwnd, $sb, $sb.Capacity) | Out-Null
+            $title = $sb.ToString()
+            if ($title) {
+                Write-Output $title
+            }
+        }
+    }
+    return $true
+}, [IntPtr]::Zero) | ConvertTo-Json
+'''
+        result = os.popen(f'powershell -Command "{script}"').read()
+        windows = [w.strip() for w in result.strip().split('\n') if w.strip()]
+        return json_response({"success": True, "windows": windows})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/window/activate')
+def window_activate():
+    """激活窗口（通过标题模糊匹配）"""
+    title = request.args.get('title', '')
+    
+    if not title:
+        return json_response({"error": "title required"}, 400)
+    
+    try:
+        # 使用 PowerShell 激活窗口
+        script = f'''
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WinActivate {{
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+}}
+"@
+$hwnd = [WinActivate]::FindWindow([NullString]::Value, "{title}*")
+if ($hwnd -ne [IntPtr]::Zero) {{
+    [WinActivate]::SetForegroundWindow($hwnd) | Out-Null
+    Write-Output "success"
+}} else {{
+    Write-Output "not_found"
+}}
+'''
+        result = os.popen(f'powershell -Command "{script}"').read().strip()
+        
+        if "success" in result:
+            logger.action("window_activate", title)
+            return json_response({"success": True, "title": title})
+        else:
+            return json_response({"success": False, "error": "Window not found"}), 404
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/window/minimize')
+def window_minimize():
+    """最小化窗口"""
+    title = request.args.get('title', '')
+    
+    if not title:
+        return json_response({"error": "title required"}, 400)
+    
+    try:
+        script = f'''
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WinMinimize {{
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+}}
+"@
+$hwnd = [WinMinimize]::FindWindow([NullString]::Value, "{title}*")
+if ($hwnd -ne [IntPtr]::Zero) {{
+    [WinMinimize]::ShowWindow($hwnd, 6) | Out-Null
+    Write-Output "success"
+}} else {{
+    Write-Output "not_found"
+}}
+'''
+        result = os.popen(f'powershell -Command "{script}"').read().strip()
+        
+        if "success" in result:
+            logger.action("window_minimize", title)
+            return json_response({"success": True, "title": title})
+        else:
+            return json_response({"success": False, "error": "Window not found"}), 404
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/window/maximize')
+def window_maximize():
+    """最大化窗口"""
+    title = request.args.get('title', '')
+    
+    if not title:
+        return json_response({"error": "title required"}, 400)
+    
+    try:
+        script = f'''
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WinMaximize {{
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+}}
+"@
+$hwnd = [WinMaximize]::FindWindow([NullString]::Value, "{title}*")
+if ($hwnd -ne [IntPtr]::Zero) {{
+    [WinMaximize]::ShowWindow($hwnd, 3) | Out-Null
+    Write-Output "success"
+}} else {{
+    Write-Output "not_found"
+}}
+'''
+        result = os.popen(f'powershell -Command "{script}"').read().strip()
+        
+        if "success" in result:
+            logger.action("window_maximize", title)
+            return json_response({"success": True, "title": title})
+        else:
+            return json_response({"success": False, "error": "Window not found"}), 404
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/window/close')
+def window_close():
+    """关闭窗口"""
+    title = request.args.get('title', '')
+    
+    if not title:
+        return json_response({"error": "title required"}, 400)
+    
+    try:
+        script = f'''
+Add-Type @"
+using System;
+using System.Diagnostics;
+public class WinClose {{
+    public static void CloseWindow(string title) {{
+        var processes = Process.GetProcesses();
+        foreach (var p in processes) {{
+            if (p.MainWindowTitle.StartsWith(title)) {{
+                p.CloseMainWindow();
+                return;
+            }}
+        }}
+    }}
+}}
+"@
+[WinClose]::CloseWindow("{title}")
+Write-Output "done"
+'''
+        result = os.popen(f'powershell -Command "{script}"').read().strip()
+        logger.action("window_close", title)
+        return json_response({"success": True, "title": title})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+# ============================================================
+# 路由：系统信息
+# ============================================================
+
+@app.route('/system/info')
+def system_info():
+    """获取系统信息"""
+    try:
+        import platform
+        return json_response({
+            "success": True,
+            "system": {
+                "os": platform.system(),
+                "release": platform.release(),
+                "version": platform.version(),
+                "machine": platform.machine(),
+                "processor": platform.processor(),
+            },
+            "screen": {
+                "size": pyautogui.size(),
+                "primary": pyautogui.size(),
+            },
+            "controller": {
+                "version": VERSION,
+                "data_dir": str(Config.DATA_DIR),
+                "uptime": State.uptime(),
+                "action_count": State.action_count,
+            }
+        })
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+# ============================================================
+# 路由：操作日志
+# ============================================================
+
+@app.route('/logs')
+def get_logs():
+    """获取操作日志"""
+    try:
+        log_file = Config.LOG_DIR / f"controller_{datetime.now().strftime('%Y%m%d')}.log"
+        if log_file.exists():
+            with open(log_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()[-50:]  # 最近50条
+            return json_response({"success": True, "logs": lines})
+        else:
+            return json_response({"success": True, "logs": []})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
 
 # ============================================================
 # 快捷键处理
