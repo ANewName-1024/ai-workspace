@@ -1210,26 +1210,28 @@ def update_pull():
 @app.route('/update/restart')
 def update_restart():
     """重启服务"""
+    import subprocess
     try:
         logger.warning("Restarting service...")
         
-        # 启动新的服务进程
         script_path = os.path.abspath(__file__)
-        os.system(f'start "" python "{script_path}"')
         
-        # 退出当前服务
-        logger.warning("Service restarting...")
+        # 创建重启脚本
+        restart_script = script_path + ".restart.bat"
+        with open(restart_script, 'w', encoding='utf-8') as f:
+            f.write(f'''@echo off
+timeout /t 2 /nobreak > nul
+start "" python "{script_path}"
+del "{restart_script}"
+''')
         
-        # 延迟退出，让响应先返回
-        def delayed_exit():
-            time.sleep(2)
-            os._exit(0)
-        
-        threading.Thread(target=delayed_exit, daemon=True).start()
+        # 启动重启脚本然后退出
+        subprocess.Popen(['cmd', '/c', restart_script], 
+                       creationflags=subprocess.CREATE_NEW_CONSOLE)
         
         return json_response({
             "success": True,
-            "message": "Service restarting..."
+            "message": "Restarting in 2 seconds..."
         })
     except Exception as e:
         return json_response({"success": False, "error": str(e)}), 500
@@ -1237,31 +1239,54 @@ def update_restart():
 @app.route('/update/pull-and-restart')
 def update_pull_and_restart():
     """拉取更新并重启"""
-    # 先拉取
+    import subprocess
+    
     try:
         url = "https://raw.githubusercontent.com/ANewName-1024/ai-workspace/master/windows-gui-controller/windows_controller.py"
-        response = urllib.request.urlopen(url, timeout=30)
-        latest_code = response.read().decode()
         
+        # 使用requests库（如果可用）
+        try:
+            import requests
+            response = requests.get(url, timeout=30)
+            latest_code = response.text
+        except:
+            response = urllib.request.urlopen(url, timeout=30)
+            latest_code = response.read().decode()
+        
+        # 备份当前版本
         current_path = os.path.abspath(__file__)
+        backup_path = current_path + f".backup.{int(time.time())}"
+        shutil.copy2(current_path, backup_path)
+        
+        # 写入新代码
         with open(current_path, 'w', encoding='utf-8') as f:
             f.write(latest_code)
         
-        # 重启
-        logger.warning("Pull and restart...")
+        logger.warning(f"代码已更新，备份: {backup_path}，准备重启...")
         
-        def delayed_restart():
-            time.sleep(2)
-            script_path = os.path.abspath(__file__)
-            os.system(f'start "" python "{script_path}"')
-            os._exit(0)
+        # 使用更可靠的方式重启
+        # 创建重启脚本
+        restart_script = current_path + ".restart.bat"
+        with open(restart_script, 'w', encoding='utf-8') as f:
+            f.write(f'''@echo off
+timeout /t 2 /nobreak > nul
+start "" python "{current_path}"
+del "{restart_script}"
+''')
         
-        threading.Thread(target=delayed_restart, daemon=True).start()
+        # 启动重启脚本然后退出
+        subprocess.Popen(['cmd', '/c', restart_script], 
+                       creationflags=subprocess.CREATE_NEW_CONSOLE)
         
         return json_response({
             "success": True,
-            "message": "Updated and restarting..."
+            "message": "Updated! Restarting in 2 seconds...",
+            "backup": backup_path
         })
+        
+    except Exception as e:
+        logger.error(f"更新失败: {e}")
+        return json_response({"success": False, "error": str(e)}), 500
     except Exception as e:
         return json_response({"success": False, "error": str(e)}), 500
 
