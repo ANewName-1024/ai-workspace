@@ -30,7 +30,7 @@ class DesktopIndicator:
     """桌面控制状态指示器"""
     
     API_URL = "http://localhost:8888"
-    POLL_INTERVAL = 2
+    POLL_INTERVAL = 3  # 改为3秒减少网络请求
     IDLE_TIMEOUT = 30
     
     # 现代扁平化配色方案
