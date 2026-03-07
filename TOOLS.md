@@ -31,6 +31,17 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+## SSH (阿里云服务器)
+
+- **能力**: 连接远程服务器执行命令、传输文件
+- **凭据位置**: `/root/.openclaw/credentials/aikey.pem`
+- **连接信息**:
+  - Host: 8.137.116.121
+  - Port: 2222
+  - User: root
+- **执行命令**: 无需审批
+- **传输文件**: 需要审批
+
 ## GitHub
 
 - **能力**: 通过 GitHub API 推送代码、创建文件、读取仓库内容
