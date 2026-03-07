@@ -10,6 +10,7 @@
 - 文件传输（带生命周期管理）
 - 应用管理
 - 命令执行
+- 智能学习与自动化
 
 ## 功能特性
 
@@ -22,15 +23,34 @@
 | 📷 屏幕 | screenshot, position, size, pixel | 截图与分析 |
 | 📁 文件 | upload, download, list, delete, cleanup | 传输与生命周期管理 |
 | 📱 应用 | open, close, running | 应用管理 |
-| ⚙️ 系统 | health, version, capabilities, run | 状态与命令执行 |
+| 📋 剪贴板 | read, write | 读写剪贴板 |
+| 🪟 窗口 | list, activate, minimize, maximize, close | 窗口管理 |
+| ⚙️ 系统 | health, version, capabilities, info, logs | 状态与命令执行 |
 
-### 安全特性
+### 智能功能
 
-- 命令白名单（可选）
-- 文件操作路径限制
-- 上传大小限制
-- 自动清理过期文件
-- 操作日志审计
+| 功能 | 说明 |
+|------|------|
+| 🧠 点击学习 | 记录常用按钮位置，下次直接点击 |
+| 📝 OCR 识别 | 识别屏幕上的文字 |
+| 🔍 查找文字 | 找到文字在屏幕上的位置 |
+| ⚡ 自动化序列 | 批量执行多个操作 |
+
+### 自动更新
+
+| 功能 | 说明 |
+|------|------|
+| 🔄 update/check | 检查 GitHub 更新 |
+| ⬇️ update/pull | 拉取最新代码 |
+| 🔁 update/restart | 重启服务 |
+| 🚀 update | 拉取并重启（一步完成） |
+
+### 桌面指示器
+
+- 顶置显示控制状态
+- 现代扁平设计 + 渐变色
+- 实时显示操作次数
+- 可拖拽移动位置
 
 ## 快速开始
 
@@ -58,6 +78,7 @@ python windows_controller.py
 本机IP: 192.168.x.x
 WSL IP: 172.x.x.x
 ============================================================
+📱 桌面指示器已启动
 🚀 服务启动: http://192.168.x.x:8888
 ```
 
@@ -66,89 +87,16 @@ WSL IP: 172.x.x.x
 - 本机访问：`http://localhost:8888`
 - WSL 访问：`http://<Windows-IP>:8888`
 
-### 4. API 文档
+### 4. 自动更新
 
-启动后访问：
-- `/` - API 概览
-- `/version` - 版本信息
-- `/capabilities` - 所有能力
-- `/health` - 健康检查
-
-## WSL 集成
-
-在 WSL 中使用 `win-gui` 脚本：
+服务支持自动从 GitHub 更新：
 
 ```bash
-cd windows-gui-controller
+# 检查更新
+curl "http://192.168.2.22:8888/update/check"
 
-# 鼠标控制
-./win-gui click 100 200
-./win-gui move 500 500
-./win-gui drag 0 0 100 100
-
-# 键盘控制
-./win-gui type hello
-./win-gui press enter
-./win-gui hotkey ctrl,c
-
-# 屏幕操作
-./win-gui screenshot
-./win-gui position
-./win-gui size
-
-# 文件操作
-./win-gui upload file.txt
-./win-gui download C:/path/to/file
-./win-gui list
-
-# 应用管理
-./win-gui open notepad
-./win-gui close notepad
-
-# 系统
-./win-gui version
-./win-gui capabilities
-./win-gui health
-```
-
-## 桌面指示器
-
-可选的桌面顶置状态显示：
-
-```powershell
-python desktop_indicator.py
-```
-
-功能：
-- 顶置显示控制状态
-- 实时显示操作次数
-- 右键菜单操作
-
-## 配置说明
-
-### 路径配置
-
-自动检测 D 盘，如不存在则使用用户目录：
-
-```python
-if Path("D:/").exists():
-    DATA_DIR = Path("D:/OpenClaw")
-else:
-    DATA_DIR = Path.home() / "OpenClaw"
-```
-
-### 文件生命周期
-
-默认 5 分钟自动清理：
-
-```python
-FILE_TTL = 300  # 秒，0=不自动删除
-```
-
-### 上传限制
-
-```python
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
+# 拉取并重启
+curl "http://192.168.2.22:8888/update"
 ```
 
 ## API 详解
@@ -207,57 +155,70 @@ curl "http://192.168.2.22:8888/size"
 curl "http://192.168.2.22:8888/pixel?x=100&y=200"
 ```
 
-### 文件传输
+### 智能功能
 
 ```bash
-# 上传
-curl -F "file=@test.txt" "http://192.168.2.22:8888/upload"
+# 学习点击位置
+curl "http://192.168.2.22:8888/learn/click?x=100&y=200&element=submit"
 
-# 下载
-curl "http://192.168.2.22:8888/download?path=D:/test.txt" -o test.txt
+# 点击已学习的位置
+curl "http://192.168.2.22:8888/learn/click_at?element=submit"
 
-# 列表
-curl "http://192.168.2.22:8888/list?path=D:/OpenClaw/uploads"
+# 查看已学按钮
+curl "http://192.168.2.22:8888/learn/buttons"
 
-# 删除
-curl "http://192.168.2.22:8888/delete?path=D:/OpenClaw/uploads/xxx.png"
+# OCR 识别
+curl "http://192.168.2.22:8888/ocr"
 
-# 清理
-curl "http://192.168.2.22:8888/cleanup"
+# 查找文字位置
+curl "http://192.168.2.22:8888/find/text?text=Hello"
+
+# 自动化序列
+curl "http://192.168.2.22:8888/macro/run?actions=click,100,200|type,hello|press,enter"
 ```
 
-### 应用管理
+### 自动更新
 
 ```bash
-# 打开应用
-curl "http://192.168.2.22:8888/open?app=notepad"
-curl "http://192.168.2.22:8888/open?app=calc"
-curl "http://192.168.2.22:8888/open?app=chrome"
+# 检查更新
+curl "http://192.168.2.22:8888/update/check"
 
-# 关闭应用
-curl "http://192.168.2.22:8888/close?app=notepad"
+# 拉取更新
+curl "http://192.168.2.22:8888/update/pull"
 
-# 运行中的应用
-curl "http://192.168.2.22:8888/running"
+# 重启服务
+curl "http://192.168.2.22:8888/update/restart"
+
+# 拉取并重启
+curl "http://192.168.2.22:8888/update"
 ```
 
-### 能力查询
+## 配置说明
 
-```bash
-# 版本
-curl "http://192.168.2.22:8888/version"
+### 路径配置
 
-# 所有能力
-curl "http://192.168.2.22:8888/capabilities"
+自动检测 D 盘，如不存在则使用用户目录：
 
-# 特定分类
-curl "http://192.168.2.22:8888/capabilities/mouse"
-curl "http://192.168.2.22:8888/capabilities/keyboard"
+```python
+if Path("D:/").exists():
+    DATA_DIR = Path("D:/OpenClaw")
+else:
+    DATA_DIR = Path.home() / "OpenClaw"
 ```
 
-## 快捷键
+### 文件生命周期
 
-- `Ctrl+Shift+X` - 停止服务（需安装 keyboard 模块）
+默认 5 分钟自动清理：
+
+```python
+FILE_TTL = 300  # 秒，0=不自动删除
+```
+
+### 上传限制
+
+```python
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
+```
 
 ## 目录结构
 
@@ -265,8 +226,8 @@ curl "http://192.168.2.22:8888/capabilities/keyboard"
 windows-gui-controller/
 ├── README.md                 # 本文件
 ├── windows_controller.py    # 主服务
-├── desktop_indicator.py      # 桌面指示器
-└── win-gui                  # WSL 调用脚本
+├── desktop_indicator.py    # 桌面指示器
+└── win-gui              # WSL 调用脚本
 
 D:\OpenClaw\
 ├── uploads\          # 上传文件
@@ -284,6 +245,8 @@ D:\OpenClaw\
 - 文件生命周期管理
 - 版本与能力 API
 - 桌面状态指示器
+- 智能学习功能 (OCR/点击学习/自动化序列)
+- 自动更新能力
 
 ### v1.0.0
 - 基础鼠标/键盘控制
