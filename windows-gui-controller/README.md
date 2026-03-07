@@ -58,8 +58,15 @@
 
 ```powershell
 cd windows-gui-controller
-pip install flask pyautogui pillow keyboard
+pip install flask pyautogui pillow keyboard requests
 ```
+
+**依赖说明：**
+- `flask` - Web 服务框架（必需）
+- `pyautogui` - 鼠标/键盘控制（必需）
+- `pillow` - 图片处理（必需）
+- `keyboard` - 全局快捷键（可选，用于 Ctrl+Shift+X 停止服务）
+- `requests` - HTTP 请求库（自动更新功能必需）
 
 ### 2. 启动服务
 
