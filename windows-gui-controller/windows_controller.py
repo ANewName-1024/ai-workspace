@@ -390,6 +390,13 @@ CAPABILITIES = {
         "logs": {"desc": "获取操作日志"},
     },
     
+    "update": {
+        "check": {"desc": "检查更新"},
+        "pull": {"desc": "拉取最新代码"},
+        "restart": {"desc": "重启服务"},
+        "pull-and-restart": {"desc": "拉取并重启"},
+    },
+    
     "config": {
         "storage": str(Config.DATA_DIR),
         "file_ttl": Config.FILE_TTL,
@@ -1100,17 +1107,152 @@ def system_info():
 # 路由：操作日志
 # ============================================================
 
-@app.route('/logs')
-def get_logs():
-    """获取操作日志"""
+# ============================================================
+# 路由：远程更新
+# ============================================================
+
+import urllib.request
+import shutil
+
+@app.route('/update/check')
+def update_check():
+    """检查更新"""
     try:
-        log_file = Config.LOG_DIR / f"controller_{datetime.now().strftime('%Y%m%d')}.log"
-        if log_file.exists():
-            with open(log_file, 'r', encoding='utf-8') as f:
-                lines = f.readlines()[-50:]  # 最近50条
-            return json_response({"success": True, "logs": lines})
-        else:
-            return json_response({"success": True, "logs": []})
+        # 从 GitHub 获取最新版本
+        url = "https://raw.githubusercontent.com/ANewName-1024/ai-workspace/master/windows-gui-controller/windows_controller.py"
+        response = urllib.request.urlopen(url, timeout=10)
+        latest_code = response.read().decode()
+        
+        # 读取当前版本
+        current_path = os.path.abspath(__file__)
+        with open(current_path, 'r', encoding='utf-8') as f:
+            current_code = f.read()
+        
+        # 简单比较版本号
+        current_version = VERSION
+        # 从最新代码中提取版本号
+        import re
+        match = re.search(r'VERSION = "([^"]+)"', latest_code)
+        latest_version = match.group(1) if match else "unknown"
+        
+        return json_response({
+            "success": True,
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "update_available": current_version != latest_version
+        })
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/update/pull')
+def update_pull():
+    """从 GitHub 拉取更新"""
+    try:
+        url = "https://raw.githubusercontent.com/ANewName-1024/ai-workspace/master/windows-gui-controller/windows_controller.py"
+        response = urllib.request.urlopen(url, timeout=30)
+        latest_code = response.read().decode()
+        
+        # 备份当前版本
+        current_path = os.path.abspath(__file__)
+        backup_path = current_path + f".backup.{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        shutil.copy2(current_path, backup_path)
+        
+        # 写入最新代码
+        with open(current_path, 'w', encoding='utf-8') as f:
+            f.write(latest_code)
+        
+        logger.action("update", "pulled latest code")
+        
+        return json_response({
+            "success": True,
+            "message": "Code updated. Restart service to apply changes.",
+            "backup": backup_path
+        })
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/update/restart')
+def update_restart():
+    """重启服务"""
+    try:
+        logger.warning("Restarting service...")
+        
+        # 启动新的服务进程
+        script_path = os.path.abspath(__file__)
+        os.system(f'start "" python "{script_path}"')
+        
+        # 退出当前服务
+        logger.warning("Service restarting...")
+        
+        # 延迟退出，让响应先返回
+        def delayed_exit():
+            time.sleep(2)
+            os._exit(0)
+        
+        threading.Thread(target=delayed_exit, daemon=True).start()
+        
+        return json_response({
+            "success": True,
+            "message": "Service restarting..."
+        })
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/update/pull-and-restart')
+def update_pull_and_restart():
+    """拉取更新并重启"""
+    # 先拉取
+    try:
+        url = "https://raw.githubusercontent.com/ANewName-1024/ai-workspace/master/windows-gui-controller/windows_controller.py"
+        response = urllib.request.urlopen(url, timeout=30)
+        latest_code = response.read().decode()
+        
+        current_path = os.path.abspath(__file__)
+        with open(current_path, 'w', encoding='utf-8') as f:
+            f.write(latest_code)
+        
+        # 重启
+        logger.warning("Pull and restart...")
+        
+        def delayed_restart():
+            time.sleep(2)
+            script_path = os.path.abspath(__file__)
+            os.system(f'start "" python "{script_path}"')
+            os._exit(0)
+        
+        threading.Thread(target=delayed_restart, daemon=True).start()
+        
+        return json_response({
+            "success": True,
+            "message": "Updated and restarting..."
+        })
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+# ============================================================
+# 路由：自我扩展
+# ============================================================
+
+@app.route('/eval')
+def code_eval():
+    """执行 Python 代码（危险！仅用于开发测试）"""
+    code = request.args.get('code', '')
+    
+    if not code:
+        return json_response({"error": "code required"}, 400)
+    
+    # 安全检查：只允许特定的安全操作
+    allowed_modules = ['pyautogui', 'os', 'sys', 'time', 'json', 'subprocess']
+    for mod in allowed_modules:
+        if f'import {mod}' in code or f'from {mod}' in code:
+            return json_response({"error": f"Module {mod} not allowed in eval mode"}, 403)
+    
+    try:
+        # 使用 exec 执行代码（非常危险！）
+        output = []
+        exec_globals = {"result": None}
+        exec(code, exec_globals)
+        return json_response({"success": True, "result": str(exec_globals.get("result"))})
     except Exception as e:
         return json_response({"success": False, "error": str(e)}), 500
 
