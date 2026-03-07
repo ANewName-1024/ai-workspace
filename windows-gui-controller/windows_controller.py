@@ -1262,22 +1262,30 @@ def update_pull_and_restart():
         logger.warning(f"代码已更新，备份: {backup_path}，准备重启...")
         
         # 使用更可靠的方式重启
-        # 创建重启脚本
+        # 创建重启脚本 - 先杀旧进程再启动新进程
         restart_script = current_path + ".restart.bat"
         with open(restart_script, 'w', encoding='utf-8') as f:
             f.write(f'''@echo off
-timeout /t 2 /nobreak > nul
+taskkill /F /IM python.exe /FI "WINDOWTITLE eq *windows_controller*" 2>nul
+timeout /t 1 /nobreak > nul
 start "" python "{current_path}"
 del "{restart_script}"
 ''')
         
-        # 启动重启脚本然后退出
+        # 启动重启脚本然后退出当前进程
         subprocess.Popen(['cmd', '/c', restart_script], 
                        creationflags=subprocess.CREATE_NEW_CONSOLE)
         
+        # 延迟退出让响应先返回
+        def delayed_exit():
+            time.sleep(1)
+            os._exit(0)
+        
+        threading.Thread(target=delayed_exit, daemon=True).start()
+        
         return json_response({
             "success": True,
-            "message": "Updated! Restarting in 2 seconds...",
+            "message": "Updated! Restarting...",
             "backup": backup_path
         })
         
