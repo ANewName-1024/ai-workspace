@@ -12,10 +12,29 @@ ai-workspace/
 │   ├── feishu-drive/        # 飞书云盘
 │   ├── feishu-perm/         # 飞书权限
 │   └── feishu-wiki/         # 飞书知识库
-└── src/                      # 飞书 SDK 源码
+├── src/                      # 飞书 SDK 源码
+└── patches/                 # OpenClaw 源码补丁
+    └── feishu/             # 飞书扩展补丁
 ```
 
 ## 模块说明
+
+### 飞书扩展补丁 (patches/feishu)
+
+修复飞书消息发送的已知问题：
+
+| 修复 | 说明 |
+|------|------|
+| 图片发送 | 修复图片显示为附件的问题，将 `/tmp` 加入允许上传路径 |
+
+**补丁文件：** `patches/feishu/outbound.ts.patch`
+
+应用方法：
+```bash
+# 复制到 OpenClaw 扩展目录
+cp patches/feishu/outbound.ts.patch /usr/lib/node_modules/openclaw/extensions/feishu/src/
+# 或手动应用修改
+```
 
 ### Windows GUI Controller
 
