@@ -1,0 +1,803 @@
+"""
+Windows GUI Controller - 企业级桌面控制服务
+============================================
+
+产品定位:
+    为 AI Agent 提供 Windows 桌面远程控制能力
+    
+核心功能:
+    - 鼠标/键盘控制
+    - 屏幕截图与分析
+    - 文件传输（带生命周期管理）
+    - 应用管理
+    - 命令执行
+    
+安全特性:
+    - 命令白名单（可选）
+    - 文件操作路径限制
+    - 上传大小限制
+    - 自动清理过期文件
+    
+架构设计:
+    - Flask REST API
+    - 模块化路由
+    - 配置中心化
+    - 统一的错误处理
+    - 日志系统
+    - 健康检查
+
+依赖:
+    pip install flask pyautogui pillow keyboard pywin32
+
+快速开始:
+    python windows_controller.py
+"""
+
+import os
+import sys
+import json
+import time
+import uuid
+import logging
+import threading
+import socket
+import atexit
+from pathlib import Path
+from datetime import datetime
+from functools import wraps
+
+# 第三方库
+from flask import Flask, request, jsonify, send_file, Response
+import pyautogui
+from io import BytesIO
+
+# 可选依赖
+try:
+    import keyboard
+    HAS_KEYBOARD = True
+except ImportError:
+    HAS_KEYBOARD = False
+
+try:
+    import win32api
+    import win32con
+    import win32gui
+    HAS_WIN32 = True
+except ImportError:
+    HAS_WIN32 = False
+
+# ============================================================
+# 配置中心
+# ============================================================
+
+class Config:
+    """配置中心 - 统一管理所有配置"""
+    
+    # 服务配置
+    PORT = 8888
+    HOST = '0.0.0.0'
+    DEBUG = False
+    
+    # 路径配置
+    BASE_DIR = Path(__file__).parent
+    
+    # 根据盘符选择存储位置
+    if Path("D:/").exists():
+        DATA_DIR = Path("D:/OpenClaw")
+    else:
+        DATA_DIR = Path.home() / "OpenClaw"
+    
+    UPLOAD_DIR = DATA_DIR / "uploads"
+    SCREENSHOT_DIR = DATA_DIR / "screenshots"
+    TEMP_DIR = DATA_DIR / "temp"
+    LOG_DIR = DATA_DIR / "logs"
+    
+    # 文件生命周期 (秒), 0=不自动删除
+    FILE_TTL = 300
+    
+    # 上传限制 (字节)
+    MAX_UPLOAD_SIZE = 50 * 1024 * 1024
+    
+    # 命令白名单 (空列表=允许所有)
+    ALLOWED_COMMANDS = []
+    
+    # 安全配置
+    ALLOWED_PATHS = [str(UPLOAD_DIR), str(SCREENSHOT_DIR), str(TEMP_DIR)]
+    
+    # PyAutoGUI 配置
+    FAILSAFE = True
+    PAUSE = 0.05
+    
+    # 快捷键
+    STOP_hotkey = 'ctrl+shift+x'
+    
+    @classmethod
+    def init(cls):
+        """初始化目录结构"""
+        # 先创建根目录，再创建子目录
+        cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        for dir_path in [cls.UPLOAD_DIR, cls.SCREENSHOT_DIR, cls.TEMP_DIR, cls.LOG_DIR]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+        
+        # 配置 PyAutoGUI
+        pyautogui.FAILSAFE = cls.FAILSAFE
+        pyautogui.PAUSE = cls.PAUSE
+
+# ============================================================
+# 日志系统
+# ============================================================
+
+class Logger:
+    """日志系统"""
+    
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._init()
+        return cls._instance
+    
+    def _init(self):
+        # 确保配置目录已创建
+        Config.init()
+        
+        self.logger = logging.getLogger("WindowsController")
+        self.logger.setLevel(logging.INFO)
+        
+        # 控制台处理器
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        
+        # 文件处理器 - 先确保目录存在
+        Config.LOG_DIR.mkdir(parents=True, exist_ok=True)
+        log_file = Config.LOG_DIR / f"controller_{datetime.now().strftime('%Y%m%d')}.log"
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        
+        # 格式
+        fmt = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+        console.setFormatter(fmt)
+        file_handler.setFormatter(fmt)
+        
+        self.logger.addHandler(console)
+        self.logger.addHandler(file_handler)
+    
+    def info(self, msg, **kwargs):
+        self.logger.info(msg, extra=kwargs)
+    
+    def warning(self, msg, **kwargs):
+        self.logger.warning(msg, extra=kwargs)
+    
+    def error(self, msg, **kwargs):
+        self.logger.error(msg, extra=kwargs)
+    
+    def action(self, action_type, details):
+        """记录操作日志"""
+        self.logger.info(f"[{action_type}] {details}", extra={"action": action_type})
+
+logger = Logger()
+
+# ============================================================
+# 状态管理
+# ============================================================
+
+class State:
+    """应用状态"""
+    
+    running = True
+    start_time = time.time()
+    action_count = 0
+    sessions = {}  # session_id -> info
+    
+    @classmethod
+    def uptime(cls):
+        return int(time.time() - cls.start_time)
+    
+    @classmethod
+    def reset(cls):
+        cls.running = True
+        cls.start_time = time.time()
+        cls.action_count = 0
+
+# ============================================================
+# 工具函数
+# ============================================================
+
+def get_ip():
+    """获取本机 IP"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
+def get_wsl_ip():
+    """获取 WSL IP"""
+    try:
+        result = os.popen("wsl hostname -I").read().strip()
+        return result.split()[0] if result else None
+    except:
+        return None
+
+def safe_path(path_str):
+    """安全路径检查"""
+    path = Path(os.path.expanduser(path_str)).resolve()
+    allowed = [Path(p).resolve() for p in Config.ALLOWED_PATHS if Path(p).exists()]
+    
+    for base in allowed:
+        try:
+            path.relative_to(base)
+            return str(path)
+        except ValueError:
+            continue
+    
+    return None
+
+def generate_session_id():
+    return str(uuid.uuid4())[:8]
+
+def json_response(data, code=200):
+    return Response(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        status=code,
+        mimetype='application/json'
+    )
+
+# ============================================================
+# 核心业务逻辑
+# ============================================================
+
+class FileManager:
+    """文件生命周期管理"""
+    
+    @staticmethod
+    def cleanup():
+        """清理过期文件"""
+        now = time.time()
+        cleaned = 0
+        
+        for directory in [Config.UPLOAD_DIR, Config.TEMP_DIR]:
+            if not directory.exists():
+                continue
+                
+            for filepath in directory.iterdir():
+                if not filepath.is_file():
+                    continue
+                    
+                age = now - filepath.stat().st_mtime
+                if Config.FILE_TTL > 0 and age > Config.FILE_TTL:
+                    try:
+                        filepath.unlink()
+                        cleaned += 1
+                    except Exception as e:
+                        logger.warning(f"清理失败: {filepath} - {e}")
+        
+        if cleaned > 0:
+            logger.info(f"清理了 {cleaned} 个过期文件")
+        
+        return cleaned
+    
+    @staticmethod
+    def get_file_info(filepath):
+        """获取文件信息"""
+        stat = filepath.stat()
+        return {
+            "name": filepath.name,
+            "size": stat.st_size,
+            "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "age_seconds": int(time.time() - stat.st_mtime)
+        }
+
+# ============================================================
+# Flask 应用
+# ============================================================
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = Config.MAX_UPLOAD_SIZE
+
+# ============================================================
+# 路由：静态资源
+# ============================================================
+
+@app.route('/')
+def index():
+    """主页面"""
+    return json_response({
+        "service": "Windows GUI Controller",
+        "version": "2.0.0",
+        "status": "running" if State.running else "stopped",
+        "endpoints": {
+            "mouse": ["/click", "/dblclick", "/rightclick", "/move", "/drag"],
+            "keyboard": ["/type", "/press", "/hotkey"],
+            "screen": ["/screenshot", "/position", "/size", "/pixel"],
+            "file": ["/upload", "/download", "/list", "/delete", "/cleanup"],
+            "app": ["/open", "/close", "/running"],
+            "system": ["/health", "/stop", "/run"]
+        }
+    })
+
+@app.route('/health')
+def health():
+    """健康检查"""
+    return json_response({
+        "status": "ok",
+        "uptime": State.uptime(),
+        "action_count": State.action_count,
+        "config": {
+            "file_ttl": Config.FILE_TTL,
+            "data_dir": str(Config.DATA_DIR),
+            "has_keyboard": HAS_KEYBOARD,
+            "has_win32": HAS_WIN32
+        },
+        "system": {
+            "host_ip": get_ip(),
+            "wsl_ip": get_wsl_ip(),
+            "screen": pyautogui.size(),
+            "mouse": pyautogui.position()
+        }
+    })
+
+# ============================================================
+# 路由：鼠标控制
+# ============================================================
+
+@app.route('/click')
+def mouse_click():
+    """鼠标点击"""
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    button = request.args.get('button', 'left')
+    clicks = request.args.get('clicks', 1, type=int)
+    
+    if x is None or y is None:
+        return json_response({"error": "x, y required"}, 400)
+    
+    pyautogui.click(x, y, clicks=clicks, button=button)
+    State.action_count += 1
+    logger.action("click", f"x={x}, y={y}, button={button}")
+    
+    return json_response({"success": True, "action": "click", "x": x, "y": y})
+
+@app.route('/dblclick')
+def mouse_double_click():
+    """双击"""
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    
+    if x is None or y is None:
+        return json_response({"error": "x, y required"}, 400)
+    
+    pyautogui.doubleClick(x, y)
+    State.action_count += 1
+    
+    return json_response({"success": True, "x": x, "y": y})
+
+@app.route('/rightclick')
+def mouse_right_click():
+    """右键点击"""
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    
+    if x is None or y is None:
+        return json_response({"error": "x, y required"}, 400)
+    
+    pyautogui.rightClick(x, y)
+    State.action_count += 1
+    
+    return json_response({"success": True, "x": x, "y": y})
+
+@app.route('/move')
+def mouse_move():
+    """移动鼠标"""
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    duration = request.args.get('duration', 0, type=float)
+    
+    if x is None or y is None:
+        return json_response({"error": "x, y required"}, 400)
+    
+    pyautogui.moveTo(x, y, duration=duration)
+    
+    return json_response({"success": True, "x": x, "y": y})
+
+@app.route('/drag')
+def mouse_drag():
+    """拖拽"""
+    x1 = request.args.get('x1', type=int)
+    y1 = request.args.get('y1', type=int)
+    x2 = request.args.get('x2', type=int)
+    y2 = request.args.get('y2', type=int)
+    duration = request.args.get('duration', 0.5, type=float)
+    
+    if any(v is None for v in [x1, y1, x2, y2]):
+        return json_response({"error": "x1,y1,x2,y2 required"}, 400)
+    
+    pyautogui.moveTo(x1, y1, duration=0.2)
+    pyautogui.mouseDown()
+    pyautogui.moveTo(x2, y2, duration=duration)
+    pyautogui.mouseUp()
+    State.action_count += 1
+    
+    return json_response({"success": True, "from": [x1,y1], "to": [x2,y2]})
+
+@app.route('/scroll')
+def mouse_scroll():
+    """滚动"""
+    clicks = request.args.get('clicks', 3, type=int)
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    
+    if x and y:
+        pyautogui.scroll(clicks, x=x, y=y)
+    else:
+        pyautogui.scroll(clicks)
+    
+    return json_response({"success": True, "clicks": clicks})
+
+# ============================================================
+# 路由：键盘控制
+# ============================================================
+
+@app.route('/type')
+def keyboard_type():
+    """输入文字"""
+    text = request.args.get('text', '')
+    interval = request.args.get('interval', 0, type=float)
+    
+    pyautogui.write(text, interval=interval)
+    State.action_count += 1
+    
+    return json_response({"success": True, "text": text})
+
+@app.route('/press')
+def keyboard_press():
+    """按键"""
+    key = request.args.get('key', '')
+    presses = request.args.get('presses', 1, type=int)
+    
+    keys = key.split(',') if ',' in key else [key]
+    for k in keys:
+        pyautogui.press(k, presses=presses)
+    State.action_count += 1
+    
+    return json_response({"success": True, "key": key})
+
+@app.route('/hotkey')
+def keyboard_hotkey():
+    """组合键"""
+    keys = request.args.get('keys', '').split(',')
+    
+    if not keys:
+        return json_response({"error": "keys required"}, 400)
+    
+    pyautogui.hotkey(*keys)
+    State.action_count += 1
+    logger.action("hotkey", ",".join(keys))
+    
+    return json_response({"success": True, "keys": keys})
+
+# ============================================================
+# 路由：屏幕操作
+# ============================================================
+
+@app.route('/screenshot')
+def screen_capture():
+    """截图"""
+    img = pyautogui.screenshot()
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    
+    State.action_count += 1
+    
+    return Response(buffer.getvalue(), mimetype='image/png')
+
+@app.route('/screenshot/file')
+def screen_capture_file():
+    """截图并保存"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"screen_{timestamp}.png"
+    filepath = Config.SCREENSHOT_DIR / filename
+    
+    img = pyautogui.screenshot()
+    img.save(filepath)
+    
+    State.action_count += 1
+    logger.action("screenshot", str(filepath))
+    
+    return json_response({
+        "success": True,
+        "path": str(filepath),
+        "info": FileManager.get_file_info(filepath)
+    })
+
+@app.route('/position')
+def mouse_position():
+    """鼠标位置"""
+    x, y = pyautogui.position()
+    return json_response({"x": x, "y": y})
+
+@app.route('/size')
+def screen_size():
+    """屏幕分辨率"""
+    width, height = pyautogui.size()
+    return json_response({"width": width, "height": height})
+
+@app.route('/pixel')
+def pixel_color():
+    """像素颜色"""
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    
+    if x is None or y is None:
+        return json_response({"error": "x, y required"}, 400)
+    
+    color = pyautogui.screenshot().getpixel((x, y))
+    hex_color = "#{:02x}{:02x}{:02x}".format(*color)
+    
+    return json_response({"x": x, "y": y, "rgb": color, "hex": hex_color})
+
+# ============================================================
+# 路由：文件操作
+# ============================================================
+
+@app.route('/upload', methods=['POST'])
+def file_upload():
+    """上传文件"""
+    if 'file' not in request.files:
+        return json_response({"error": "No file provided"}, 400)
+    
+    file = request.files['file']
+    if file.filename == '':
+        return json_response({"error": "Empty filename"}, 400)
+    
+    # 生成唯一文件名
+    ext = Path(file.filename).suffix
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    filepath = Config.UPLOAD_DIR / unique_name
+    
+    # 保存
+    file.save(filepath)
+    
+    logger.action("upload", f"{file.filename} -> {unique_name}")
+    
+    return json_response({
+        "success": True,
+        "original_name": file.filename,
+        "stored_name": unique_name,
+        "path": str(filepath),
+        "size": filepath.stat().st_size,
+        "ttl": Config.FILE_TTL
+    })
+
+@app.route('/download')
+def file_download():
+    """下载文件"""
+    path = request.args.get('path', '')
+    
+    if not path:
+        return json_response({"error": "path required"}, 400)
+    
+    safe = safe_path(path)
+    if not safe:
+        return json_response({"error": "Path not allowed"}, 403)
+    
+    filepath = Path(safe)
+    if not filepath.exists():
+        return json_response({"error": "File not found"}, 404)
+    
+    return send_file(filepath)
+
+@app.route('/list')
+def file_list():
+    """文件列表"""
+    path = request.args.get('path', str(Config.UPLOAD_DIR))
+    
+    safe = safe_path(path)
+    if not safe:
+        return json_response({"error": "Path not allowed"}, 403)
+    
+    dir_path = Path(safe)
+    if not dir_path.exists():
+        return json_response({"error": "Path not found"}, 404)
+    
+    items = []
+    for item in dir_path.iterdir():
+        if item.is_file():
+            items.append(FileManager.get_file_info(item))
+    
+    return json_response({
+        "path": str(dir_path),
+        "files": items,
+        "count": len(items)
+    })
+
+@app.route('/delete')
+def file_delete():
+    """删除文件"""
+    path = request.args.get('path', '')
+    
+    if not path:
+        return json_response({"error": "path required"}, 400)
+    
+    safe = safe_path(path)
+    if not safe:
+        return json_response({"error": "Path not allowed"}, 403)
+    
+    filepath = Path(safe)
+    if not filepath.exists():
+        return json_response({"error": "File not found"}, 404)
+    
+    filepath.unlink()
+    logger.action("delete", str(filepath))
+    
+    return json_response({"success": True, "path": str(filepath)})
+
+@app.route('/cleanup')
+def file_cleanup():
+    """清理过期文件"""
+    cleaned = FileManager.cleanup()
+    return json_response({"success": True, "cleaned": cleaned})
+
+# ============================================================
+# 路由：应用管理
+# ============================================================
+
+APPS = {
+    'notepad': 'notepad.exe',
+    'calc': 'calc.exe',
+    'explorer': 'explorer.exe',
+    'cmd': 'cmd.exe',
+    'powershell': 'powershell.exe',
+    'chrome': 'chrome.exe',
+    'edge': 'msedge.exe',
+    'qq': 'QQ.exe',
+    'wechat': 'WeChat.exe',
+    'dingtalk': 'DingTalk.exe',
+}
+
+@app.route('/open')
+def app_open():
+    """打开应用"""
+    app_name = request.args.get('app', '')
+    
+    exe = APPS.get(app_name, app_name)
+    os.system(f'start "" "{exe}"')
+    
+    logger.action("open_app", app_name)
+    
+    return json_response({"success": True, "app": app_name})
+
+@app.route('/close')
+def app_close():
+    """关闭应用"""
+    app_name = request.args.get('app', '')
+    
+    if not app_name:
+        return json_response({"error": "app required"}, 400)
+    
+    os.system(f'taskkill /f /im {app_name}.exe')
+    logger.action("close_app", app_name)
+    
+    return json_response({"success": True, "app": app_name})
+
+@app.route('/running')
+def app_running():
+    """运行中的应用"""
+    result = os.popen('tasklist /FO CSV /NH').read()
+    apps = [line.split(',')[0].strip('"') for line in result.split('\n') if line]
+    
+    return json_response({"apps": apps, "count": len(apps)})
+
+# ============================================================
+# 路由：系统
+# ============================================================
+
+@app.route('/run')
+def system_run():
+    """执行命令"""
+    cmd = request.args.get('cmd', '')
+    shell = request.args.get('shell', 'cmd')
+    
+    if not cmd:
+        return json_response({"error": "cmd required"}, 400)
+    
+    # 白名单检查
+    if Config.ALLOWED_COMMANDS and cmd not in Config.ALLOWED_COMMANDS:
+        return json_response({"error": "Command not allowed"}, 403)
+    
+    try:
+        if shell == 'powershell':
+            result = os.popen(f'powershell -Command "{cmd}"').read()
+        else:
+            result = os.popen(cmd).read()
+        
+        logger.action("run", cmd[:50])
+        
+        return json_response({"success": True, "cmd": cmd, "output": result})
+    except Exception as e:
+        return json_response({"error": str(e)}, 500)
+
+@app.route('/stop')
+def system_stop():
+    """停止服务"""
+    State.running = False
+    logger.warning("Service stopped by user")
+    return json_response({"success": True, "message": "Service will stop"})
+
+# ============================================================
+# 快捷键处理
+# ============================================================
+
+def setup_shortcuts():
+    """设置快捷键"""
+    if not HAS_KEYBOARD:
+        logger.warning("keyboard 模块未安装，快捷键功能不可用")
+        return
+    
+    try:
+        keyboard.add_hotkey(Config.STOP_hotkey, lambda: (
+            logger.warning("收到停止信号"),
+            os._exit(0)
+        ))
+        logger.info(f"快捷键已注册: {Config.STOP_hotkey} 停止服务")
+    except Exception as e:
+        logger.warning(f"快捷键设置失败: {e}")
+
+# ============================================================
+# 后台任务
+# ============================================================
+
+def start_background_tasks():
+    """启动后台任务"""
+    
+    # 定期清理线程
+    def cleanup_task():
+        while State.running:
+            time.sleep(60)
+            FileManager.cleanup()
+    
+    thread = threading.Thread(target=cleanup_task, daemon=True)
+    thread.start()
+    logger.info("后台清理任务已启动")
+
+# ============================================================
+# 入口
+# ============================================================
+
+def main():
+    """主函数"""
+    # 初始化
+    Config.init()
+    
+    logger.info("=" * 60)
+    logger.info("🖥️  Windows GUI Controller v2.0")
+    logger.info("=" * 60)
+    logger.info(f"数据目录: {Config.DATA_DIR}")
+    logger.info(f"上传目录: {Config.UPLOAD_DIR}")
+    logger.info(f"截图目录: {Config.SCREENSHOT_DIR}")
+    logger.info(f"文件有效期: {Config.FILE_TTL}秒")
+    logger.info(f"本机IP: {get_ip()}")
+    logger.info(f"WSL IP: {get_wsl_ip()}")
+    logger.info("=" * 60)
+    
+    # 启动后台任务
+    start_background_tasks()
+    
+    # 设置快捷键
+    setup_shortcuts()
+    
+    # 注册退出清理
+    atexit.register(FileManager.cleanup)
+    
+    # 启动服务
+    logger.info(f"🚀 服务启动: http://{get_ip()}:{Config.PORT}")
+    app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG, threaded=True)
+
+if __name__ == '__main__':
+    main()
