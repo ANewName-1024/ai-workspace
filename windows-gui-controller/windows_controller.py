@@ -111,27 +111,24 @@ class Config:
     # 智能学习配置
     ENABLE_LEARNING = True
     COORDINATE_CACHE_FILE = str(DATA_DIR / "coordinate_cache.json")
-
-# 智能坐标缓存 - 学习常用UI元素位置
-coordinate_cache = {
-    "buttons": {},  # "button_name": {"x": 100, "y": 200, "last_updated": timestamp}
-    "recent_clicks": [],  # [{"x": 100, "y": 200, "element": "submit", "time": timestamp}]
-}
-    
-    # 快捷键
-    STOP_hotkey = 'ctrl+shift+x'
     
     @classmethod
     def init(cls):
         """初始化目录结构"""
-        # 先创建根目录，再创建子目录
         cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
         for dir_path in [cls.UPLOAD_DIR, cls.SCREENSHOT_DIR, cls.TEMP_DIR, cls.LOG_DIR]:
             dir_path.mkdir(parents=True, exist_ok=True)
-        
-        # 配置 PyAutoGUI
         pyautogui.FAILSAFE = cls.FAILSAFE
         pyautogui.PAUSE = cls.PAUSE
+
+# 智能坐标缓存 - 学习常用UI元素位置
+coordinate_cache = {
+    "buttons": {},
+    "recent_clicks": [],
+}
+
+# 快捷键配置
+STOP_hotkey = 'ctrl+shift+x'
 
 # ============================================================
 # 日志系统
