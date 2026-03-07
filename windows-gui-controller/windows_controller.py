@@ -108,6 +108,16 @@ class Config:
     FAILSAFE = True
     PAUSE = 0.05
     
+    # 智能学习配置
+    ENABLE_LEARNING = True
+    COORDINATE_CACHE_FILE = str(DATA_DIR / "coordinate_cache.json")
+
+# 智能坐标缓存 - 学习常用UI元素位置
+coordinate_cache = {
+    "buttons": {},  # "button_name": {"x": 100, "y": 200, "last_updated": timestamp}
+    "recent_clicks": [],  # [{"x": 100, "y": 200, "element": "submit", "time": timestamp}]
+}
+    
     # 快捷键
     STOP_hotkey = 'ctrl+shift+x'
     
@@ -395,6 +405,19 @@ CAPABILITIES = {
         "pull": {"desc": "拉取最新代码"},
         "restart": {"desc": "重启服务"},
         "pull-and-restart": {"desc": "拉取并重启"},
+    },
+    
+    "learn": {
+        "click": {"args": ["x", "y", "element"], "desc": "记录点击学习"},
+        "buttons": {"desc": "获取已学习按钮"},
+        "click_at": {"args": ["element"], "desc": "点击已学按钮"},
+        "history": {"desc": "获取点击历史"},
+    },
+    
+    "intelligence": {
+        "ocr": {"desc": "OCR识别屏幕文字"},
+        "find/text": {"args": ["text"], "desc": "查找文字位置"},
+        "macro/run": {"args": ["actions"], "desc": "运行自动化序列"},
     },
     
     "config": {
@@ -1230,11 +1253,146 @@ def update_pull_and_restart():
         return json_response({"success": False, "error": str(e)}), 500
 
 # ============================================================
-# 路由：自我扩展
+# 路由：智能学习
 # ============================================================
 
-@app.route('/eval')
-def code_eval():
+import json
+
+def save_coordinate_cache():
+    """保存坐标缓存"""
+    try:
+        cache_file = Path(Config.COORDINATE_CACHE_FILE)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            json.dump(coordinate_cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"保存坐标缓存失败: {e}")
+
+def load_coordinate_cache():
+    """加载坐标缓存"""
+    global coordinate_cache
+    try:
+        cache_file = Path(Config.COORDINATE_CACHE_FILE)
+        if cache_file.exists():
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                coordinate_cache = json.load(f)
+    except Exception as e:
+        logger.warning(f"加载坐标缓存失败: {e}")
+
+# 启动时加载缓存
+load_coordinate_cache()
+
+@app.route('/learn/click')
+def learn_click():
+    """记录点击位置并学习"""
+    x = request.args.get('x', type=int)
+    y = request.args.get('y', type=int)
+    element = request.args.get('element', '')
+    
+    if x is None or y is None:
+        return json_response({"error": "x, y required"}, 400)
+    
+    coordinate_cache["recent_clicks"].append({
+        "x": x, "y": y, "element": element, "time": time.time()
+    })
+    coordinate_cache["recent_clicks"] = coordinate_cache["recent_clicks"][-100:]
+    
+    if element:
+        coordinate_cache["buttons"][element] = {
+            "x": x, "y": y, "last_updated": time.time(),
+            "click_count": coordinate_cache["buttons"].get(element, {}).get("click_count", 0) + 1
+        }
+    
+    save_coordinate_cache()
+    return json_response({"success": True, "learned": element or f"({x},{y})", "total": len(coordinate_cache["recent_clicks"])})
+
+@app.route('/learn/buttons')
+def learn_buttons():
+    """获取已学习的按钮位置"""
+    return json_response({"success": True, "buttons": coordinate_cache["buttons"]})
+
+@app.route('/learn/click_at')
+def learn_click_at():
+    """点击已学习的位置"""
+    element = request.args.get('element', '')
+    if element in coordinate_cache["buttons"]:
+        pos = coordinate_cache["buttons"][element]
+        pyautogui.click(pos["x"], pos["y"])
+        State.action_count += 1
+        return json_response({"success": True, "clicked": element, "position": pos})
+    return json_response({"success": False, "error": f"未知: {element}"}), 404
+
+@app.route('/learn/history')
+def learn_history():
+    """获取点击历史"""
+    return json_response({"success": True, "history": coordinate_cache["recent_clicks"][-20:]})
+
+@app.route('/ocr')
+def ocr_screen():
+    """OCR 识别屏幕文字"""
+    try:
+        from PIL import Image
+        import pytesseract
+        img = pyautogui.screenshot()
+        text = pytesseract.image_to_string(img, lang='chi_sim+eng')
+        State.action_count += 1
+        return json_response({"success": True, "text": text.strip()[:1000], "length": len(text)})
+    except ImportError:
+        return json_response({"success": False, "error": "需要安装 pytesseract"}), 500
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/find/text')
+def find_text_position():
+    """查找文字在屏幕上的位置"""
+    text = request.args.get('text', '').lower()
+    if not text:
+        return json_response({"error": "text required"}, 400)
+    try:
+        from PIL import Image
+        import pytesseract
+        img = pyautogui.screenshot()
+        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+        matches = []
+        for i in range(len(data['text'])):
+            if text in data['text'][i].lower():
+                matches.append({"text": data['text'][i], "x": data['left'][i], "y": data['top'][i]})
+        return json_response({"success": True, "matches": matches, "count": len(matches)})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}), 500
+
+@app.route('/macro/run')
+def macro_run():
+    """运行自动化序列"""
+    actions = request.args.get('actions', '')
+    if not actions:
+        return json_response({"error": "actions required (click,x,y|type,text|press,key|wait,seconds)"}, 400)
+    results = []
+    try:
+        for action in actions.split('|'):
+            parts = action.split(',')
+            cmd = parts[0]
+            if cmd == 'click' and len(parts) >= 3:
+                pyautogui.click(int(parts[1]), int(parts[2]))
+                results.append(f"click {parts[1]},{parts[2]}")
+            elif cmd == 'type' and len(parts) >= 2:
+                pyautogui.write(parts[1])
+                results.append(f"type {parts[1]}")
+            elif cmd == 'press' and len(parts) >= 2:
+                pyautogui.press(parts[1])
+                results.append(f"press {parts[1]}")
+            elif cmd == 'wait' and len(parts) >= 2:
+                time.sleep(float(parts[1]))
+                results.append(f"wait {parts[1]}s")
+            time.sleep(0.2)
+        State.action_count += 1
+        return json_response({"success": True, "results": results})
+    except Exception as e:
+        return json_response({"success": False, "error": str(e), "completed": results}), 500
+
+# ============================================================
+# 路由：自我扩展
+# ============================================================
     """执行 Python 代码（危险！仅用于开发测试）"""
     code = request.args.get('code', '')
     
