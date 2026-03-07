@@ -615,14 +615,27 @@ def keyboard_hotkey():
 @app.route('/screenshot')
 def screen_capture():
     """截图"""
-    img = pyautogui.screenshot()
-    buffer = BytesIO()
-    img.save(buffer, format='PNG')
-    buffer.seek(0)
-    
-    State.action_count += 1
-    
-    return Response(buffer.getvalue(), mimetype='image/png')
+    try:
+        img = pyautogui.screenshot()
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        State.action_count += 1
+        
+        return Response(buffer.getvalue(), mimetype='image/png')
+    except Exception as e:
+        logger.warning(f"截图失败: {e}")
+        # 等待一小段时间后重试
+        time.sleep(0.5)
+        try:
+            img = pyautogui.screenshot()
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            buffer.seek(0)
+            return Response(buffer.getvalue(), mimetype='image/png')
+        except Exception as e2:
+            return json_response({"success": False, "error": str(e2)}), 500
 
 @app.route('/screenshot/file')
 def screen_capture_file():
@@ -1454,6 +1467,21 @@ def start_background_tasks():
 # 入口
 # ============================================================
 
+def start_indicator():
+    """启动桌面控制状态指示器"""
+    indicator_path = os.path.join(os.path.dirname(__file__), 'desktop_indicator.py')
+    if os.path.exists(indicator_path):
+        try:
+            # 使用 pythonw 运行（无控制台窗口）
+            os.system(f'start pythonw "{indicator_path}"')
+            logger.info("📱 桌面指示器已启动")
+        except Exception as e:
+            logger.warning(f"⚠️ 指示器启动失败: {e}")
+    else:
+        logger.warning("⚠️ 指示器文件不存在")
+
+# ============================================================
+
 def main():
     """主函数"""
     # 初始化
@@ -1476,12 +1504,22 @@ def main():
     # 设置快捷键
     setup_shortcuts()
     
+    # 启动桌面指示器
+    start_indicator()
+    
     # 注册退出清理
     atexit.register(FileManager.cleanup)
     
     # 启动服务
     logger.info(f"🚀 服务启动: http://{get_ip()}:{Config.PORT}")
-    app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG, threaded=True)
+    
+    # 添加错误处理防止崩溃
+    from werkzeug.serving import make_server
+    
+    try:
+        app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG, threaded=True)
+    except Exception as e:
+        logger.error(f"服务启动失败: {e}")
 
 if __name__ == '__main__':
     main()
