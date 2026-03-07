@@ -94,6 +94,9 @@ export const feishuOutbound: ChannelOutboundAdapter = {
     return { channel: "feishu", ...result };
   },
   sendMedia: async ({ cfg, to, text, mediaUrl, accountId, mediaLocalRoots }) => {
+    // Add /tmp to allowed local roots for image uploads
+    const allowedRoots = [...(mediaLocalRoots || []), "/tmp", "/root/.openclaw/workspace"];
+    
     // Send text first if provided
     if (text?.trim()) {
       await sendOutboundText({
@@ -112,7 +115,7 @@ export const feishuOutbound: ChannelOutboundAdapter = {
           to,
           mediaUrl,
           accountId: accountId ?? undefined,
-          mediaLocalRoots,
+          mediaLocalRoots: allowedRoots,
         });
         return { channel: "feishu", ...result };
       } catch (err) {
