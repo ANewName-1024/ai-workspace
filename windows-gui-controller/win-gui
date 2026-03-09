@@ -1,0 +1,212 @@
+#!/bin/bash
+# Windows GUI Controller - Pro Edition
+# 用法: win-gui <command> [args...]
+
+BASE_URL="http://192.168.2.22:8888"
+
+case "$1" in
+  # 鼠标
+  click)
+    curl -s "${BASE_URL}/click?x=$2&y=$3"
+    ;;
+  dblclick)
+    curl -s "${BASE_URL}/dblclick?x=$2&y=$3"
+    ;;
+  rightclick)
+    curl -s "${BASE_URL}/rightclick?x=$2&y=$3"
+    ;;
+  move)
+    curl -s "${BASE_URL}/move?x=$2&y=$3"
+    ;;
+  drag)
+    curl -s "${BASE_URL}/drag?x1=$2&y1=$3&x2=$4&y2=$5"
+    ;;
+  
+  # 键盘
+  type)
+    text="$2"
+    for arg in "${@:3}"; do text="$text+$arg"; done
+    curl -s "${BASE_URL}/type?text=$text"
+    ;;
+  press)
+    curl -s "${BASE_URL}/press?key=$2"
+    ;;
+  hotkey)
+    keys=$(echo "$2" | sed 's/,/%2C/g')
+    curl -s "${BASE_URL}/hotkey?keys=$keys"
+    ;;
+  
+  # 屏幕
+  screenshot)
+    curl -s "${BASE_URL}/screenshot" -o /tmp/win_screen.png
+    echo "/tmp/win_screen.png"
+    ;;
+  position)
+    curl -s "${BASE_URL}/position"
+    ;;
+  size)
+    curl -s "${BASE_URL}/size"
+    ;;
+  pixel)
+    curl -s "${BASE_URL}/pixel?x=$2&y=$3"
+    ;;
+  scroll)
+    curl -s "${BASE_URL}/scroll?clicks=$2"
+    ;;
+  
+  # 文件
+  upload)
+    local_file="$2"
+    if [ ! -f "$local_file" ]; then
+        echo "Error: File not found: $local_file"
+        exit 1
+    fi
+    curl -s -F "file=@${local_file}" "${BASE_URL}/upload"
+    ;;
+  download)
+    win_path="$2"
+    local_path="${3:-$(basename $win_path)}"
+    curl -s "${BASE_URL}/download?path=${win_path}" -o "$local_path"
+    echo "Saved to: $local_path"
+    ;;
+  list)
+    path="${2:-${HOME}}"
+    curl -s "${BASE_URL}/list?path=${path}"
+    ;;
+  
+  # 应用
+  open)
+    curl -s "${BASE_URL}/open?app=$2"
+    ;;
+  close)
+    curl -s "${BASE_URL}/close?app=$2"
+    ;;
+  running)
+    curl -s "${BASE_URL}/running"
+    ;;
+  
+  # 其他
+  run)
+    cmd="$2"
+    curl -s "${BASE_URL}/run?cmd=${cmd}"
+    ;;
+  stop)
+    curl -s "${BASE_URL}/stop"
+    ;;
+  health)
+    curl -s "${BASE_URL}/health"
+    ;;
+  version)
+    curl -s "${BASE_URL}/version"
+    ;;
+  capabilities|caps)
+    curl -s "${BASE_URL}/capabilities"
+    ;;
+  caps)
+    category="$2"
+    curl -s "${BASE_URL}/capabilities/${category}"
+    ;;
+  
+  # 更新
+  update-check)
+    curl -s "${BASE_URL}/update/check"
+    ;;
+  update-pull)
+    curl -s "${BASE_URL}/update/pull"
+    ;;
+  update-restart)
+    curl -s "${BASE_URL}/update/restart"
+    ;;
+  update)
+    curl -s "${BASE_URL}/update/pull-and-restart"
+    ;;
+  
+  # 剪贴板
+  clipboard-read|cb-read)
+    curl -s "${BASE_URL}/clipboard/read"
+    ;;
+  clipboard-write|cb-write)
+    text="$2"
+    curl -s "${BASE_URL}/clipboard/write?text=${text}"
+    ;;
+  
+  # 窗口
+  window-list|win-list)
+    curl -s "${BASE_URL}/window/list"
+    ;;
+  window-activate|win-active)
+    title="$2"
+    curl -s "${BASE_URL}/window/activate?title=${title}"
+    ;;
+  window-minimize|win-min)
+    title="$2"
+    curl -s "${BASE_URL}/window/minimize?title=${title}"
+    ;;
+  window-maximize|win-max)
+    title="$2"
+    curl -s "${BASE_URL}/window/maximize?title=${title}"
+    ;;
+  window-close|win-close)
+    title="$2"
+    curl -s "${BASE_URL}/window/close?title=${title}"
+    ;;
+  
+  # 系统
+  system-info|info)
+    curl -s "${BASE_URL}/system/info"
+    ;;
+  logs)
+    curl -s "${BASE_URL}/logs"
+    ;;
+  
+  # 帮助
+  help|--help|-h)
+    echo "Windows GUI Controller - v2.0"
+    echo ""
+    echo "用法: win-gui <command> [args...]"
+    echo ""
+    echo "版本与更新:"
+    echo "  win-gui version              查看版本"
+    echo "  win-gui capabilities         查看所有能力"
+    echo "  win-gui update-check        检查更新"
+    echo "  win-gui update              拉取更新并重启"
+    echo ""
+    echo "鼠标控制:"
+    echo "  click <x> <y>               鼠标点击"
+    echo "  dblclick <x> <y>       双击"
+    echo "  rightclick <x> <y>     右键"
+    echo "  move <x> <y>           移动鼠标"
+    echo "  drag <x1> <y1> <x2> <y2> 拖拽"
+    echo ""
+    echo "键盘控制:"
+    echo "  type <text>             输入文字"
+    echo "  press <key>             按键 (enter, esc, a...)"
+    echo "  hotkey <keys>           组合键 (ctrl,c / alt,tab)"
+    echo ""
+    echo "屏幕:"
+    echo "  screenshot              截图 (输出文件路径)"
+    echo "  position                鼠标位置"
+    echo "  size                    屏幕分辨率"
+    echo "  pixel <x> <y>           像素颜色"
+    echo "  scroll <clicks>         滚动"
+    echo ""
+    echo "文件传输:"
+    echo "  upload <file>           上传到 Windows"
+    echo "  download <win_path> [local] 下载文件"
+    echo "  list [path]             列出目录"
+    echo ""
+    echo "应用:"
+    echo "  open <app>              打开应用"
+    echo "  close <app>             关闭应用"
+    echo "  running                 运行中的进程"
+    echo ""
+    echo "其他:"
+    echo "  run <cmd>               执行命令"
+    echo "  stop                    停止服务"
+    echo "  health                  健康检查"
+    ;;
+  *)
+    echo "未知命令: $1"
+    echo "用 win-gui help 查看帮助"
+    ;;
+esac
