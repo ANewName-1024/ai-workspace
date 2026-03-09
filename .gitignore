@@ -1,0 +1,35 @@
+# Python 环境
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 大文件
+伟信设备照片全20111102.zip
+weixin-products/
+
+# 日志
+logs/
+*.log
+
+# OpenClaw 运行时
+.vector_store/
+vector_api.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
