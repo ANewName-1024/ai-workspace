@@ -33,3 +33,10 @@ vector_api.pid
 # OS
 .DS_Store
 Thumbs.db
+
+# 机器学习模型缓存
+.cache/
+
+# 临时文件
+*.deb
+cuda-*
