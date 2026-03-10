@@ -145,6 +145,54 @@ curl -s -X POST http://localhost:8765/search \
 bash
 */15 * * * * cd /root/.openclaw/workspace && .venv/bin/python vector_cli.py sync >> logs/vector_sync.log 2>&1
 
+## 监控与自动恢复
+
+### 网络连通性检查
+
+定时检测网络连通性，不消耗 token（纯 crontab 执行）。
+
+```bash
+# 检查脚本
+/root/.openclaw/workspace/scripts/network-check.sh
+
+# 定时任务（每 15 分钟）
+*/15 * * * * /root/.openclaw/workspace/scripts/network-check.sh
+
+# 日志文件
+/root/.openclaw/logs/network-check.log
+```
+
+检查目标：阿里云服务器、百度 DNS、Cloudflare DNS
+
+日志轮转：logrotate 自动处理（7 天）
+
+### 健康检测与自动拉起
+
+OpenClaw Gateway 通过 systemd 托管，支持自动拉起：
+
+```bash
+# 查看状态
+systemctl status openclaw
+
+# 重启策略
+# Restart=always
+# RestartSec=10s (10 秒后自动重启)
+```
+
+### 开机自动启动 (Windows + WSL)
+
+Windows 开机后自动启动 WSL 和 OpenClaw：
+
+```powershell
+# 管理员 PowerShell 执行
+schtasks /create /tn "OpenClaw_AutoStart" /tr "wsl -e bash -c 'cd /root/.openclaw && source .venv/bin/activate && openclaw gateway start'" /sc onstart /rl highest /f
+```
+
+相关脚本：
+- `scripts/start-openclaw.sh` - WSL 启动脚本
+- `scripts/start-openclaw.bat` - Windows 批处理脚本
+- `scripts/create-autostart-task.ps1` - 计划任务创建脚本
+
 ## 环境变量
 
 ### Feishu
