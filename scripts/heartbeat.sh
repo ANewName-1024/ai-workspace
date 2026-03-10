@@ -13,8 +13,8 @@ if [ -f "$LOG_FILE" ] && [ $(stat -c%s "$LOG_FILE") -gt $MAX_SIZE ]; then
     gzip -f "${LOG_FILE%.log}-$(date +%Y%m%d).log"
 fi
 
-# 检测 OpenClaw 状态
-STATUS_OUTPUT=$(openclaw status 2>&1)
+# 检测 OpenClaw 状态 (使用完整路径)
+STATUS_OUTPUT=$(/usr/bin/openclaw status 2>&1)
 
 if echo "$STATUS_OUTPUT" | grep -q "Gateway.*running"; then
     STATUS="running"
