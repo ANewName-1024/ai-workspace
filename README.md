@@ -10,7 +10,16 @@ ai-workspace/
 │   ├── feishu-doc/          # 飞书文档
 │   ├── feishu-drive/        # 飞书云盘
 │   ├── feishu-perm/         # 飞书权限
-│   └── feishu-wiki/         # 飞书知识库
+│   ├── feishu-wiki/         # 飞书知识库
+│   ├── weather/             # 天气查询
+│   ├── notion/              # Notion 集成
+│   ├── obsidian/            # Obsidian 笔记
+│   ├── slack/               # Slack 控制
+│   ├── tmux/                # tmux 会话控制
+│   ├── self-improving/      # 自我反思学习
+│   └── clawsec/             # 安全检查
+├── scripts/                  # 工具脚本
+├── memory/                   # 工作日志和日记
 ├── src/                      # 飞书 SDK 源码
 └── patches/                 # OpenClaw 源码补丁
     └── feishu/             # 飞书扩展补丁
