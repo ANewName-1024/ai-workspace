@@ -26,10 +26,10 @@ ssh -o ConnectTimeout=10 -i /root/.openclaw/credentials/aikey.pem root@8.137.116
 - 日志位置: `/root/.openclaw/logs/network-check.log`
 - 日志轮转: 已配置 logrotate
 
-## 当前状态 (2026-03-10)
+## 当前状态 (2026-03-17 14:51)
 - 本地磁盘: 4% ✅
-- 远程磁盘: 14% ✅
-- 远程内存: 475M/1.8G (26%) ✅
+- 远程磁盘: 27% ✅
+- 远程内存: 783M/1.8G (43%) ✅
 
 ## 检查频率
 每天 2-3 次 (早 9:00, 中 14:00, 晚 21:00)

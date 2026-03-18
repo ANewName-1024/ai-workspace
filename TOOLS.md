@@ -31,6 +31,12 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+## WSL 网络配置
+
+- **状态**: 已配置 mirrored 模式，可直接访问局域网
+- **IP**: 192.168.2.22/24 (与局域网同段)
+- **配置文件**: C:\Users\Administrator\.wslconfig
+
 ## SSH (阿里云服务器)
 
 - **能力**: 连接远程服务器执行命令、传输文件

@@ -2,15 +2,14 @@
 
 _Learn about the person you're helping. Update this as you go._
 
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
+- **Name:** 魏超
+- **What to call them:** 超哥
+- **Pronouns:** 
+- **Timezone:** Asia/Shanghai
 
 ## Context
 
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
+后端开发工程师，正在准备简历和面试。需要我帮助修改简历、整理面试知识点复习材料。
 
 ---
 

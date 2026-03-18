@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "skills": {
+    "clawsec": {
+      "version": "1.0.0",
+      "installedAt": 1773272836307
+    },
+    "notion": {
+      "version": "1.0.0",
+      "installedAt": 1773336665384
+    },
+    "self-improving": {
+      "version": "1.2.16",
+      "installedAt": 1773339245760
+    },
+    "obsidian": {
+      "version": "1.0.0",
+      "installedAt": 1773344770175
+    },
+    "weather": {
+      "version": "1.0.0",
+      "installedAt": 1773346569703
+    },
+    "tmux": {
+      "version": "1.0.0",
+      "installedAt": 1773347475541
+    },
+    "slack": {
+      "version": "1.0.0",
+      "installedAt": 1773370869060
+    }
+  }
+}
