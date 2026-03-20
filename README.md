@@ -15,9 +15,13 @@ ai-workspace/
 │   ├── notion/              # Notion 集成
 │   ├── obsidian/            # Obsidian 笔记
 │   ├── slack/               # Slack 控制
+│   ├── discord/            # Discord 控制
 │   ├── tmux/                # tmux 会话控制
 │   ├── self-improving/      # 自我反思学习
-│   └── clawsec/             # 安全检查
+│   ├── clawsec/             # 安全检查
+│   ├── clawhub/             # 技能管理
+│   ├── vector-memory/       # 向量记忆搜索
+│   └── windows-gui/         # Windows GUI 控制
 ├── scripts/                  # 工具脚本
 ├── memory/                   # 工作日志和日记
 ├── src/                      # 飞书 SDK 源码
@@ -65,6 +69,17 @@ OpenClaw Agent 技能模块，提供飞书各产品线的操作能力。
 | feishu-drive | 云盘文件管理 |
 | feishu-perm | 权限管理 |
 | feishu-wiki | 知识库操作 |
+| weather | 天气查询 |
+| notion | Notion API 集成 |
+| obsidian | Obsidian 笔记管理 |
+| slack | Slack 控制 |
+| discord | Discord 控制 |
+| tmux | tmux 会话控制 |
+| self-improving | 自我反思学习 |
+| clawsec | 安全检查 |
+| clawhub | ClawHub 技能管理 |
+| vector-memory | 向量记忆搜索 |
+| windows-gui | Windows 桌面控制 |
 
 详见：
 - skills/feishu-doc/README.md

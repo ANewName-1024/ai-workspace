@@ -68,7 +68,7 @@ node C:\Users\Administrator\AppData\Roaming\npm\node_modules\openclaw\openclaw.m
 
 ---
 
-## 新增 Skills (2026-03-14~16)
+## 新增 Skills (2026-03-14~18)
 
 从 ClawHub 安装了多个技能：
 - **weather**: 天气查询
@@ -78,6 +78,9 @@ node C:\Users\Administrator\AppData\Roaming\npm\node_modules\openclaw\openclaw.m
 - **tmux**: tmux 会话控制
 - **self-improving**: 自我反思学习
 - **clawsec**: 安全检查
+- **discord**: Discord 控制
+- **clawhub**: 技能管理
+- **vector-memory**: 向量记忆搜索
 
 ---
 
