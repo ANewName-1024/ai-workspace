@@ -26,10 +26,16 @@ ssh -o ConnectTimeout=10 -i /root/.openclaw/credentials/aikey.pem root@8.137.116
 - 日志位置: `/root/.openclaw/logs/network-check.log`
 - 日志轮转: 已配置 logrotate
 
-## 当前状态 (2026-03-20 08:27)
+## 当前状态 (2026-04-04 23:18)
 - 本地磁盘: 4% ✅
-- 远程磁盘: 27% ✅
-- 远程内存: 796M/1.8G (44%) ✅
+- 远程磁盘: 31% ✅
+- 远程内存: 805M/1.8G (45%) ✅
+- Windows GUI: http://192.168.2.32:8888 ✅
+- OpenClaw Gateway: 18789 ✅
+- Axum relay: 0.2.0-axum 运行中 (~6.3h uptime) ✅
+
+## 待处理
+- Windows sshd_config 损坏，需手动修复 GatewayPorts 配置
 
 ## 检查频率
 每天 2-3 次 (早 9:00, 中 14:00, 晚 21:00)

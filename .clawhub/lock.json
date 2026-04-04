@@ -32,6 +32,14 @@
     "discord": {
       "version": "1.0.1",
       "installedAt": 1773858669794
+    },
+    "github": {
+      "version": "1.0.0",
+      "installedAt": 1774039621266
+    },
+    "agent-browser-clawdbot": {
+      "version": "0.1.0",
+      "installedAt": 1775231126845
     }
   }
 }
