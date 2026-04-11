@@ -1,42 +1,52 @@
-# Python 环境
-.venv/
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-
-# 大文件
-伟信设备照片全20111102.zip
-weixin-products/
-
-# 日志
-logs/
-*.log
-
-# OpenClaw 运行时
-.vector_store/
-vector_api.pid
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# 机器学习模型缓存
-.cache/
+# Office
+~$*
+*.tmp
 
-# 临时文件
-*.deb
-cuda-*
+# Logs
+*.log
+logs/
+
+# Build
+build/
+dist/
+target/
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+.pnp
+.pnp.js
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Archives
+*.zip
+*.tar.gz
+*.tar
+
+# Large media
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.mov
+
+# OpenClaw runtime
+memory/
+canvas/
+completions/
+sandboxes/
