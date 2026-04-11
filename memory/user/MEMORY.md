@@ -1,1 +1,0 @@
-- [hello-test](user-hello-test.md) — 首次测试记忆
